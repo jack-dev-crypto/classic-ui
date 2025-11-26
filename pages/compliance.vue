@@ -1,7 +1,7 @@
 <template>
   <div class="compliance">
     <h1 class="title is-size-1 is-size-2-mobile is-spaced">
-      Tornado.cash <span class="not-print">{{ $t('complianceTool') }}</span>
+      Tornado Cash <span class="not-print">{{ $t('complianceTool') }}</span>
       <span class="print">{{ $t('complianceReport') }}</span>
     </h1>
     <p class="p is-size-6">
@@ -114,9 +114,14 @@
           <div class="block block-withdrawal">
             <h3 class="block-item block-item--title">
               {{ $t('withdrawal') }}
-              <span>{{
+              <span v-if="txDepositInfo.currency !== 'etc'">{{
                 txWithdrawalInfo.amount
                   ? `${$n(txWithdrawalInfo.amount)} ${getSymbol(txDepositInfo.currency)}`
+                  : '-'
+              }}</span>
+              <span v-if="txDepositInfo.currency === 'etc'">{{
+                txWithdrawalInfo.amount
+                  ? `${$n(txWithdrawalInfo.amount * 0.997)} ${getSymbol(txDepositInfo.currency)}`
                   : '-'
               }}</span>
             </h3>
@@ -135,7 +140,14 @@
                     : $t('status')
                   : $t('noteHasNotBeenSpent')
               }}
-              <span class="fee">{{
+              <span v-if="txDepositInfo.currency === 'etc'" class="fee">{{
+                txWithdrawalInfo.fee
+                  ? `${$t('poolFee')} ${$n(txWithdrawalInfo.amount * 0.003)}
+                ${getSymbol(txDepositInfo.currency)},
+                ${$t('relayerFee')} ${$n(txWithdrawalInfo.fee)} ${getSymbol(txDepositInfo.currency)}`
+                  : $t('relayerFee')
+              }}</span>
+              <span v-if="txDepositInfo.currency !== 'etc'" class="fee">{{
                 txWithdrawalInfo.fee
                   ? `${$t('relayerFee')} ${$n(txWithdrawalInfo.fee)} ${getSymbol(txDepositInfo.currency)}`
                   : $t('relayerFee')
@@ -485,7 +497,7 @@ export default {
       doc.text(commitment, padding, 147)
       doc.text(nullifier, startSecondColumnX, 147)
 
-      doc.setFontSize(20).text('Tornado.cash', padding, 40)
+      doc.setFontSize(20).text('Tornado Cash', padding, 40)
       doc.setFontStyle('normal').text(this.$t('complianceReport', 'en'), 65, 40)
 
       doc.setFontSize(8).text(this.$t('verified', 'en'), padding, 81)

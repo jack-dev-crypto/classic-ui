@@ -17,8 +17,6 @@ export default {
       switch (this.netId) {
         case 1:
           return 'Ethereum'
-        case 5:
-          return 'Goerli'
         case 56:
           return 'BSC Mainnet'
         case 137:
@@ -27,6 +25,8 @@ export default {
           return 'Arbitrum'
         case 43114:
           return 'Avalanche'
+        case 11155111:
+          return 'Sepolia'
         default:
           return this.networkName
       }

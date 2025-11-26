@@ -317,8 +317,12 @@
     mask-image: url('../img/icons/ethereum.svg');
   }
 
-  &-ethereum-goerli {
-    mask-image: url('../img/icons/goerli.svg');
+  &-ethereum-classic {
+    mask-image: url('../img/icons/ethereum.svg');
+  }
+
+  &-ethereum-sepolia {
+    mask-image: url('../img/icons/ethereum.svg');
   }
 
   &-optimism {

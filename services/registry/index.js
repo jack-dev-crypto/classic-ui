@@ -3,6 +3,7 @@ import namehash from 'eth-ens-namehash'
 import { BigNumber as BN } from 'bignumber.js'
 import { toChecksumAddress, isAddress } from 'web3-utils'
 
+import { graph } from '@/services'
 import networkConfig from '@/networkConfig'
 import { REGISTRY_DEPLOYED_BLOCK } from '@/constants'
 import { sleep, flattenNArray } from '@/utils'
@@ -132,11 +133,9 @@ class RelayerRegister {
   }
 
   getCachedData = async () => {
-    let blockFrom = REGISTRY_DEPLOYED_BLOCK[1]
+    const blockFrom = REGISTRY_DEPLOYED_BLOCK[1]
 
     try {
-      const blockTo = await this.provider.getBlockNumber()
-
       const cachedEvents = await this.$indexedDB.getAll({
         storeName: 'register_events'
       })
@@ -147,8 +146,9 @@ class RelayerRegister {
         storeName: 'lastEvents'
       })
 
+      let blockTo = blockFrom
       if (lastBlock) {
-        blockFrom = blockTo >= lastBlock.blockNumber ? lastBlock.blockNumber + 1 : blockTo
+        blockTo = lastBlock.blockNumber + 1
       }
 
       return { blockFrom, blockTo, cachedEvents }
@@ -169,7 +169,23 @@ class RelayerRegister {
   fetchRelayers = async () => {
     const blockRange = 10000
     // eslint-disable-next-line prefer-const
-    let { blockTo, cachedEvents } = await this.getCachedData()
+    let { blockFrom, blockTo, cachedEvents } = await this.getCachedData()
+    let firstFetch = false
+    // There are 114 relayers in total so far,
+    // If there are less than 114 in the cache,
+    // It means that the historical data is incorrect and needs to be re-fetch through the subgraph
+    if (!cachedEvents || !cachedEvents.length || cachedEvents.length < 114) {
+      firstFetch = true // Get all relayers from the subgraph for the first time
+      const { lastSyncBlock, events } = await graph.getAllRegisters(blockFrom)
+
+      if (events.length) {
+        blockTo = lastSyncBlock + 1
+        cachedEvents = events.map((el) => ({
+          ensName: el.ensName,
+          relayerAddress: toChecksumAddress(el.address)
+        }))
+      }
+    }
     let allRelayers = cachedEvents
 
     const currentBlockNumber = await this.provider.getBlockNumber()
@@ -178,26 +194,27 @@ class RelayerRegister {
 
     try {
       let toBlock
-      let registerRelayerEvents
+      let registerRelayerEvents = cachedEvents
       let lastSyncBlock = blockTo
 
-      if (cachedEvents.length > 0 || blockDifference === 0) {
-        return cachedEvents
-      } else if (blockDifference >= blockRange) {
-        toBlock = currentBlockNumber
-        registerRelayerEvents = await this.batchFetchEvents({ fromBlock, toBlock })
-        lastSyncBlock = toBlock
-      } else {
-        toBlock = fromBlock + blockRange
-        registerRelayerEvents = await this.fetchEvents({ fromBlock, toBlock }, true)
-        lastSyncBlock = toBlock
+      if (!firstFetch) {
+        if (blockDifference <= 0) {
+          return cachedEvents
+        } else if (blockDifference >= blockRange) {
+          toBlock = currentBlockNumber
+          registerRelayerEvents = await this.batchFetchEvents({ fromBlock, toBlock })
+          lastSyncBlock = toBlock
+        } else {
+          toBlock = currentBlockNumber // Fix toBlock greater than the latest blocknumber
+          registerRelayerEvents = await this.fetchEvents({ fromBlock, toBlock }, true)
+          lastSyncBlock = toBlock
+        }
       }
 
-      const relayerEvents = cachedEvents.concat(registerRelayerEvents || [])
       const events = []
 
-      for (let x = 0; x < relayerEvents.length; x++) {
-        const { ensName, relayerAddress } = relayerEvents[x]
+      for (let x = 0; x < registerRelayerEvents.length; x++) {
+        const { ensName, relayerAddress } = registerRelayerEvents[x]
         let ensAddress
 
         if (!isAddress(relayerAddress)) {
@@ -210,9 +227,12 @@ class RelayerRegister {
         events.push({ ensName, relayerAddress: ensAddress })
       }
 
-      await this.saveEvents({ storeName: 'register_events', lastSyncBlock, events })
-
-      allRelayers = allRelayers.concat(events)
+      if (firstFetch) {
+        allRelayers = events
+      } else {
+        allRelayers = allRelayers.concat(events)
+      }
+      await this.saveEvents({ storeName: 'register_events', lastSyncBlock, events: allRelayers })
     } catch (err) {
       console.log(err)
     }
