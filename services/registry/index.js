@@ -311,7 +311,7 @@ class RelayerRegister {
     }
 
     // Call in small batches (start with 4)
-    const BATCH_SIZE = 4
+    const BATCH_SIZE = 20
     for (let i = 0; i < uniqueHashes.length; i += BATCH_SIZE) {
       const batchHashes = uniqueHashes.slice(i, i + BATCH_SIZE)
       console.log(`Processing batch starting at index ${i}, size ${batchHashes.length}`)
@@ -335,7 +335,6 @@ class RelayerRegister {
 
     return validRelayers
   }
-  
   getRelayers = async (ensSubdomainKey) => {
     const relayers = await this.fetchRelayers()
     const validRelayers = await this.getValidRelayers(relayers, ensSubdomainKey)
